@@ -1,3 +1,4 @@
+#![allow(dead_code)]
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -66,14 +67,14 @@ mod tests {
         assert_eq!(x.si_into() / z, y.si_into());
     }
     #[test]
-    fn display_unit_test() {
+    fn display_si_unit_test() {
         assert_eq!(
             format!("{}", SiUnit::new(2, 3, 4, 5, 6, 7, 8)),
             "(m^2)(kg^3)(s^4)(k^5)(A^6)(mol^7)(cd^8)"
         );
     }
     #[test]
-    fn display_value_test() {
+    fn display_si_value_test() {
         assert_eq!(
             format!("{}", SiValue::new(1, 2, 3, 4, 5, 6, 7, 8)),
             "1 (m^2)(kg^3)(s^4)(k^5)(A^6)(mol^7)(cd^8)"
