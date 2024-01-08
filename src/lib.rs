@@ -1,5 +1,5 @@
 #![allow(dead_code)]
-use std::{fmt::Display, ops::{Add, Div, Mul, Sub}, default, collections::HashMap};
+use std::{fmt::Display, ops::{Add, Div, Mul, Sub}, collections::HashMap};
 
 use prse::parse;
 #[derive(Clone, Debug, Copy)]
