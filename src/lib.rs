@@ -1,7 +1,7 @@
 #![allow(dead_code)]
 use std::{fmt::Display, ops::{Add, Div, Mul, Sub}, collections::HashMap};
 
-use prse::parse;
+use prse::{parse, try_parse};
 #[derive(Clone, Debug, Copy)]
 pub struct SiValue<T, U> {
     value: Option<T>,
@@ -148,14 +148,14 @@ impl<T: for<'a> prse::Parse<'a>, U: Default + TryFrom<f64> + for<'a> prse::Parse
     type Error = SiParseError;
 
     fn try_from(value: String) -> Result<Self, Self::Error> {
-        let (val, mut units): (T, String) = parse!(value, "{} ({}");
+        let (val, mut units): (T, String) = try_parse!(value, "{} ({}").map_err(|_| SiParseError::InvalidValueLayout)?;
     units = units.trim().to_owned();
     units.pop();
     let mut unit_hm: HashMap<String, U> = HashMap::new();
-    let split_units: Vec<String> = parse!(units, "{:)(:}");
+    let split_units: Vec<String> = try_parse!(units, "{:)(:}").map_err(|_| SiParseError::InvalidValueLayout)?;
     for unit in split_units {
-        let (unit_name, power_value): (String, String) = parse!(unit, "{}^{}");
-        let casted_power: U = prse::parse!(power_value, "{}");
+        let (unit_name, power_value): (String, String) = try_parse!(unit, "{}^{}").map_err(|_| SiParseError::InvalidValueLayout)?;
+        let casted_power: U = try_parse!(power_value, "{}").map_err(|_| SiParseError::InvalidValueLayout)?;
         unit_hm.insert(unit_name.to_lowercase(), casted_power);
     }
     Ok(SiValue::new(
@@ -271,13 +271,13 @@ impl<T: TryFrom<f64> + Default> TryFrom<String> for SiUnit<T>
     where f64: TryInto<T> {
     type Error = SiParseError;
     fn try_from(value: String) -> Result<Self, SiParseError> {
-        let mut value: String = prse::parse!(value, "({}");
+        let mut value: String = try_parse!(value, "({}").map_err(|_| SiParseError::InvalidValueLayout)?;
         value = value.trim().to_owned();
         value.pop();
-        let split_units: Vec<String> = prse::parse!(value, "{:)(:}");
+        let split_units: Vec<String> = try_parse!(value, "{:)(:}").map_err(|_| SiParseError::InvalidValueLayout)?;
         let mut ret_val: SiUnit<T> = SiUnit::default();
         for unit in split_units {
-            let (unit_name, unit_value): (String, f64) = prse::parse!(unit, "{}^{}");
+            let (unit_name, unit_value): (String, f64) = try_parse!(unit, "{}^{}").map_err(|_| SiParseError::InvalidValueLayout)?;
             match unit_name.to_lowercase().as_str() {
                 "m" => {ret_val.length = unit_value.try_into().map_err(|_| SiParseError::InvalidCast)?}
                 "kg" => {ret_val.mass = unit_value.try_into().map_err(|_| SiParseError::InvalidCast)?}
