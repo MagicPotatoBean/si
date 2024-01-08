@@ -1,7 +1,7 @@
 #![allow(dead_code)]
 use std::{fmt::Display, ops::{Add, Div, Mul, Sub}, collections::HashMap};
 
-use prse::{parse, try_parse};
+use prse::try_parse;
 #[derive(Clone, Debug, Copy)]
 pub struct SiValue<T, U> {
     value: Option<T>,
