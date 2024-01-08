@@ -1,5 +1,7 @@
 #![allow(dead_code)]
-use std::{fmt::Display, ops::{Add, Div, Mul, Sub}, default};
+use std::{fmt::Display, ops::{Add, Div, Mul, Sub}, default, collections::HashMap};
+
+use prse::parse;
 #[derive(Clone, Debug, Copy)]
 pub struct SiValue<T, U> {
     value: Option<T>,
@@ -141,6 +143,39 @@ impl<T, U> SiValue<T, U> {
         }
     }
 }
+impl<T: for<'a> prse::Parse<'a>, U: Default + TryFrom<f64> + for<'a> prse::Parse<'a> + Clone> TryFrom<String> for SiValue<T, U> 
+     {
+    type Error = SiParseError;
+
+    fn try_from(value: String) -> Result<Self, Self::Error> {
+        let (val, mut units): (T, String) = parse!(value, "{} ({}");
+    units = units.trim().to_owned();
+    units.pop();
+    let mut unit_hm: HashMap<String, U> = HashMap::new();
+    let split_units: Vec<String> = parse!(units, "{:)(:}");
+    for unit in split_units {
+        let (unit_name, power_value): (String, String) = parse!(unit, "{}^{}");
+        let casted_power: U = prse::parse!(power_value, "{}");
+        unit_hm.insert(unit_name.to_lowercase(), casted_power);
+    }
+    Ok(SiValue::new(
+        val,
+        unit_hm.get("m").cloned().unwrap_or_default(),
+        unit_hm.get("kg").cloned().unwrap_or_default(),
+        unit_hm.get("s").cloned().unwrap_or_default(),
+        unit_hm.get("k").cloned().unwrap_or_default(),
+        unit_hm.get("a").cloned().unwrap_or_default(),
+        unit_hm.get("mol").cloned().unwrap_or_default(),
+        unit_hm.get("cd").cloned().unwrap_or_default(),
+    ))
+    }
+}
+#[derive(Debug)]
+pub enum SiParseError {
+    InvalidValueLayout,
+    InvalidUnit,
+    InvalidCast,
+}
 #[derive(Clone, Debug, Copy)]
 struct SiUnit<T> {
     length: T,
@@ -242,7 +277,7 @@ impl<T: TryFrom<f64> + Default> TryFrom<String> for SiUnit<T>
         let split_units: Vec<String> = prse::parse!(value, "{:)(:}");
         let mut ret_val: SiUnit<T> = SiUnit::default();
         for unit in split_units {
-            let (unit_name, unit_value): (String, f64) = prse::parse!(unit.clone(), "{}^{}");
+            let (unit_name, unit_value): (String, f64) = prse::parse!(unit, "{}^{}");
             match unit_name.to_lowercase().as_str() {
                 "m" => {ret_val.length = unit_value.try_into().map_err(|_| SiParseError::InvalidCast)?}
                 "kg" => {ret_val.mass = unit_value.try_into().map_err(|_| SiParseError::InvalidCast)?}
@@ -264,12 +299,6 @@ impl<T: TryFrom<f64> + Default> TryFrom<&str> for SiUnit<T>
         let str = value.to_owned();
         SiUnit::try_from(str)
     }
-}
-#[derive(Debug)]
-enum SiParseError {
-    InvalidValueLayout,
-    InvalidUnit,
-    InvalidCast,
 }
 impl<T: Default> Default for SiUnit<T> {
     fn default() -> Self {
@@ -359,9 +388,15 @@ mod tests {
         );
     }
     #[test]
-    fn cast_from_string() {
+    fn cast_string_to_unit() {
         let str = "(s^4)(m^2)(cd^8)";
         let y: SiUnit<f64> = SiUnit::try_from(str).unwrap();
         assert_eq!(SiUnit::new(2.0, 0.0, 4.0, 0.0, 0.0, 0.0, 8.0), y)
+    }
+    #[test]
+    fn cast_string_to_value() {
+        let str = "3 (s^4)(m^2)(cd^8)".to_owned();
+        let y: SiValue<f64, f64> = SiValue::<f64, f64>::try_from(str).unwrap();
+        assert_eq!(SiValue::new(3.0, 2.0, 0.0, 4.0, 0.0, 0.0, 0.0, 8.0), y)
     }
 }
