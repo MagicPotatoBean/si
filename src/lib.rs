@@ -1,87 +1,5 @@
 #![allow(dead_code)]
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn declare_si_value() {
-        let x = SiValue::new(1, 2, 3, 4, 5, 6, 7, 8);
-        assert_eq!(
-            x,
-            SiValue {
-                value: Some(1),
-                unit: Some(SiUnit {
-                    length: 2,
-                    mass: 3,
-                    time: 4,
-                    temperature: 5,
-                    current: 6,
-                    amount: 7,
-                    luminous_intensity: 8
-                }),
-            }
-        )
-    }
-    #[test]
-    fn add_i32_si_values() {
-        let x = SiValue::new(1, 2, 3, 4, 5, 6, 7, 8);
-        let y = SiValue::new(10, 2, 3, 4, 5, 6, 7, 8);
-        let z = SiValue::new(11, 2, 3, 4, 5, 6, 7, 8);
-        assert_eq!(x + y, z);
-        assert_eq!(y + x, z);
-        let y = SiValue::new(10, 20, 30, 40, 50, 60, 70, 80);
-        let z = SiValue::new(11, 22, 33, 44, 55, 66, 77, 88);
-        assert_eq!(x + y, SiValue::default());
-        assert_eq!(x + z, SiValue::default());
-    }
-    #[test]
-    fn sub_i32_si_values() {
-        let x = SiValue::new(1, 2, 3, 4, 5, 6, 7, 8);
-        let y = SiValue::new(10, 2, 3, 4, 5, 6, 7, 8);
-        let z = SiValue::new(9, 2, 3, 4, 5, 6, 7, 8);
-        assert_eq!(y - x, z);
-        assert_eq!(y - z, x);
-    }
-    #[test]
-    fn mul_i32_si_values() {
-        let x = SiValue::new(5, 2, 3, 4, 5, 6, 7, 8);
-        let y = SiValue::new(10, 20, 30, 40, 50, 60, 70, 80);
-        let z = SiValue::new(50, 22, 33, 44, 55, 66, 77, 88);
-        assert_eq!(y * x, z);
-        assert_eq!(x * y, z);
-    }
-    #[test]
-    fn div_i32_si_values() {
-        let x = SiValue::new(5, 2, 3, 4, 5, 6, 7, 8);
-        let y = SiValue::new(10, 20, 30, 40, 50, 60, 70, 80);
-        let z = SiValue::new(50, 22, 33, 44, 55, 66, 77, 88);
-        assert_eq!(z / y, x);
-        assert_eq!(z / x, y);
-    }
-    #[test]
-    fn div_f64_si_values() {
-        let x = SiValue::new(1, 2, 3, 4, 5, 6, 7, 8);
-        let y = SiValue::new(10, 20, 30, 40, 50, 60, 70, 80);
-        let z = SiValue::new(0.1, -18, -27, -36, -45, -54, -63, -72);
-        assert_eq!(x.si_into::<f64, i32>() / y.si_into::<f64, i32>(), z);
-        assert_eq!(x.si_into() / z, y.si_into());
-    }
-    #[test]
-    fn display_si_unit_test() {
-        assert_eq!(
-            format!("{}", SiUnit::new(2, 3, 4, 5, 6, 7, 8)),
-            "(m^2)(kg^3)(s^4)(k^5)(A^6)(mol^7)(cd^8)"
-        );
-    }
-    #[test]
-    fn display_si_value_test() {
-        assert_eq!(
-            format!("{}", SiValue::new(1, 2, 3, 4, 5, 6, 7, 8)),
-            "1 (m^2)(kg^3)(s^4)(k^5)(A^6)(mol^7)(cd^8)"
-        );
-    }
-}
-use std::{fmt::Display, ops::{Add, Div, Mul, Sub}};
+use std::{fmt::Display, ops::{Add, Div, Mul, Sub}, default};
 #[derive(Clone, Debug, Copy)]
 pub struct SiValue<T, U> {
     value: Option<T>,
@@ -312,5 +230,138 @@ impl<T> SiUnit<T> {
             amount,
             luminous_intensity,
         }
+    }
+}
+impl<T: TryFrom<f64> + Default> TryFrom<String> for SiUnit<T>
+    where f64: TryInto<T> {
+    type Error = SiParseError;
+    fn try_from(value: String) -> Result<Self, SiParseError> {
+        let mut value: String = prse::parse!(value, "({}");
+        value = value.trim().to_owned();
+        value.pop();
+        let split_units: Vec<String> = prse::parse!(value, "{:)(:}");
+        let mut ret_val: SiUnit<T> = SiUnit::default();
+        for unit in split_units {
+            let (unit_name, unit_value): (String, f64) = prse::parse!(unit.clone(), "{}^{}");
+            match unit_name.to_lowercase().as_str() {
+                "m" => {ret_val.length = unit_value.try_into().map_err(|_| SiParseError::InvalidCast)?}
+                "kg" => {ret_val.mass = unit_value.try_into().map_err(|_| SiParseError::InvalidCast)?}
+                "s" => {ret_val.time = unit_value.try_into().map_err(|_| SiParseError::InvalidCast)?}
+                "k" => {ret_val.temperature = unit_value.try_into().map_err(|_| SiParseError::InvalidCast)?}
+                "a" => {ret_val.current = unit_value.try_into().map_err(|_| SiParseError::InvalidCast)?}
+                "mol" => {ret_val.amount = unit_value.try_into().map_err(|_| SiParseError::InvalidCast)?}
+                "cd" => {ret_val.luminous_intensity = unit_value.try_into().map_err(|_| SiParseError::InvalidCast)?}
+                _ => {}
+            }
+        }
+        Ok(ret_val)
+    }
+}
+impl<T: TryFrom<f64> + Default> TryFrom<&str> for SiUnit<T>
+    where f64: TryInto<T> {
+    type Error = SiParseError;
+    fn try_from(value: &str) -> Result<Self, SiParseError> {
+        let str = value.to_owned();
+        SiUnit::try_from(str)
+    }
+}
+#[derive(Debug)]
+enum SiParseError {
+    InvalidValueLayout,
+    InvalidUnit,
+    InvalidCast,
+}
+impl<T: Default> Default for SiUnit<T> {
+    fn default() -> Self {
+        Self { length: Default::default(), mass: Default::default(), time: Default::default(), temperature: Default::default(), current: Default::default(), amount: Default::default(), luminous_intensity: Default::default() }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn declare_si_value() {
+        let x = SiValue::new(1, 2, 3, 4, 5, 6, 7, 8);
+        assert_eq!(
+            x,
+            SiValue {
+                value: Some(1),
+                unit: Some(SiUnit {
+                    length: 2,
+                    mass: 3,
+                    time: 4,
+                    temperature: 5,
+                    current: 6,
+                    amount: 7,
+                    luminous_intensity: 8
+                }),
+            }
+        )
+    }
+    #[test]
+    fn add_i32_si_values() {
+        let x = SiValue::new(1, 2, 3, 4, 5, 6, 7, 8);
+        let y = SiValue::new(10, 2, 3, 4, 5, 6, 7, 8);
+        let z = SiValue::new(11, 2, 3, 4, 5, 6, 7, 8);
+        assert_eq!(x + y, z);
+        assert_eq!(y + x, z);
+        let y = SiValue::new(10, 20, 30, 40, 50, 60, 70, 80);
+        let z = SiValue::new(11, 22, 33, 44, 55, 66, 77, 88);
+        assert_eq!(x + y, SiValue::default());
+        assert_eq!(x + z, SiValue::default());
+    }
+    #[test]
+    fn sub_i32_si_values() {
+        let x = SiValue::new(1, 2, 3, 4, 5, 6, 7, 8);
+        let y = SiValue::new(10, 2, 3, 4, 5, 6, 7, 8);
+        let z = SiValue::new(9, 2, 3, 4, 5, 6, 7, 8);
+        assert_eq!(y - x, z);
+        assert_eq!(y - z, x);
+    }
+    #[test]
+    fn mul_i32_si_values() {
+        let x = SiValue::new(5, 2, 3, 4, 5, 6, 7, 8);
+        let y = SiValue::new(10, 20, 30, 40, 50, 60, 70, 80);
+        let z = SiValue::new(50, 22, 33, 44, 55, 66, 77, 88);
+        assert_eq!(y * x, z);
+        assert_eq!(x * y, z);
+    }
+    #[test]
+    fn div_i32_si_values() {
+        let x = SiValue::new(5, 2, 3, 4, 5, 6, 7, 8);
+        let y = SiValue::new(10, 20, 30, 40, 50, 60, 70, 80);
+        let z = SiValue::new(50, 22, 33, 44, 55, 66, 77, 88);
+        assert_eq!(z / y, x);
+        assert_eq!(z / x, y);
+    }
+    #[test]
+    fn div_f64_si_values() {
+        let x = SiValue::new(1, 2, 3, 4, 5, 6, 7, 8);
+        let y = SiValue::new(10, 20, 30, 40, 50, 60, 70, 80);
+        let z = SiValue::new(0.1, -18, -27, -36, -45, -54, -63, -72);
+        assert_eq!(x.si_into::<f64, i32>() / y.si_into::<f64, i32>(), z);
+        assert_eq!(x.si_into() / z, y.si_into());
+    }
+    #[test]
+    fn display_si_unit_test() {
+        assert_eq!(
+            format!("{}", SiUnit::new(2, 3, 4, 5, 6, 7, 8)),
+            "(m^2)(kg^3)(s^4)(k^5)(A^6)(mol^7)(cd^8)"
+        );
+    }
+    #[test]
+    fn display_si_value_test() {
+        assert_eq!(
+            format!("{}", SiValue::new(1, 2, 3, 4, 5, 6, 7, 8)),
+            "1 (m^2)(kg^3)(s^4)(k^5)(A^6)(mol^7)(cd^8)"
+        );
+    }
+    #[test]
+    fn cast_from_string() {
+        let str = "(s^4)(m^2)(cd^8)";
+        let y: SiUnit<f64> = SiUnit::try_from(str).unwrap();
+        assert_eq!(SiUnit::new(2.0, 0.0, 4.0, 0.0, 0.0, 0.0, 8.0), y)
     }
 }
